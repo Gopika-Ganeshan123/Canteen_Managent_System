@@ -5,7 +5,7 @@ class User {
   final String fullName;
   final String role;
   final double balance;
-  final DateTime createdAt;
+  final DateTime? createdAt;
 
   User({
     required this.id,
@@ -14,7 +14,7 @@ class User {
     required this.fullName,
     required this.role,
     required this.balance,
-    required this.createdAt,
+    this.createdAt,
   });
 
   factory User.fromJson(Map<String, dynamic> json) {
@@ -24,8 +24,8 @@ class User {
       email: json['email'],
       fullName: json['full_name'],
       role: json['role'],
-      balance: json['balance'].toDouble(),
-      createdAt: DateTime.parse(json['created_at']),
+      balance: (json['balance'] as num).toDouble(),
+      createdAt: json['created_at'] != null ? DateTime.parse(json['created_at']) : null,
     );
   }
 
@@ -37,7 +37,7 @@ class User {
       'full_name': fullName,
       'role': role,
       'balance': balance,
-      'created_at': createdAt.toIso8601String(),
+      'created_at': createdAt?.toIso8601String(),
     };
   }
 } 

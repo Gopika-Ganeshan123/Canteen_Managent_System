@@ -49,27 +49,37 @@ class ApiService {
 
   static Future<Map<String, dynamic>> register(Map<String, dynamic> userData) async {
     try {
+      print('Starting registration process...');
+      print('Sending registration data: ${userData.toString()}');
+      
       final response = await http.post(
         Uri.parse(ApiEndpoints.baseUrl + ApiEndpoints.register),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode(userData),
       );
 
+      print('Registration response status code: ${response.statusCode}');
+      print('Registration response body: ${response.body}');
+
       if (response.statusCode == 201) {
-        return {
-          'success': true,
-          'message': 'Registration successful',
-        };
+        final data = jsonDecode(response.body);
+        _token = data['access_token'];
+        print('Registration successful, token received');
+        return data;
       } else {
+        final data = jsonDecode(response.body);
+        print('Registration failed with error: ${data['message']}');
         return {
           'success': false,
-          'message': 'Registration failed. Please try again.',
+          'message': data['message'] ?? 'Registration failed. Please try again.',
         };
       }
     } catch (e) {
+      print('Registration error: $e');
+      print('Error stack trace: ${StackTrace.current}');
       return {
         'success': false,
-        'message': 'Network error. Please check your connection.',
+        'message': 'Network error. Please check your internet connection and try again.',
       };
     }
   }

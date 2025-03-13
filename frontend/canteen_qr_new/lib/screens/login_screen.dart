@@ -4,6 +4,7 @@ import '../constants/app_constants.dart';
 import '../providers/user_provider.dart';
 import '../widgets/custom_button.dart';
 import '../widgets/custom_text_field.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({Key? key}) : super(key: key);
@@ -37,22 +38,36 @@ class _LoginScreenState extends State<LoginScreen> {
     });
 
     try {
-      final success = await Provider.of<UserProvider>(context, listen: false)
+      final response = await Provider.of<UserProvider>(context, listen: false)
           .login(_emailController.text, _passwordController.text);
 
-      if (!success && mounted) {
-        setState(() {
-          _errorMessage = 'Invalid email or password';
-          _isLoading = false;
-        });
-      } else if (mounted) {
-        Navigator.pushReplacementNamed(context, '/home');
+      if (mounted) {
+        if (response['error'] != null) {
+          setState(() {
+            _errorMessage = response['error'];
+            _isLoading = false;
+          });
+        } else if (response['access_token'] != null) {
+          // Store token in shared preferences
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setString('token', response['access_token']);
+          
+          // Navigate to home screen and remove all previous routes
+          Navigator.of(context).pushNamedAndRemoveUntil('/home', (route) => false);
+        } else {
+          setState(() {
+            _errorMessage = 'Invalid response from server';
+            _isLoading = false;
+          });
+        }
       }
     } catch (e) {
-      setState(() {
-        _errorMessage = 'An error occurred. Please try again.';
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _errorMessage = 'An error occurred. Please try again.';
+          _isLoading = false;
+        });
+      }
     }
   }
 

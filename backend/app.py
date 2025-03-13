@@ -8,18 +8,48 @@ import qrcode
 from io import BytesIO
 import uuid
 import json
+import logging
+import sys
 
 from models import db, User, QRCode, MealPlan, MenuItem, Transaction, MealConsumption
 
+# Configure logging to show more details
+logging.basicConfig(
+    level=logging.DEBUG,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler(sys.stdout)
+    ]
+)
+logger = logging.getLogger(__name__)
+
 app = Flask(__name__)
+# Configure CORS to accept requests from your Flutter app
+CORS(app, resources={
+    r"/api/*": {
+        "origins": "*",
+        "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        "allow_headers": ["Content-Type", "Authorization"]
+    }
+})
+
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///canteen.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['JWT_SECRET_KEY'] = os.environ.get('JWT_SECRET_KEY', 'super-secret-key')  # Change in production
+app.config['JWT_SECRET_KEY'] = os.environ.get('JWT_SECRET_KEY', 'super-secret-key')
 app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(hours=24)
 
-CORS(app)
 jwt = JWTManager(app)
 db.init_app(app)
+
+@app.before_request
+def log_request_info():
+    logger.debug('Headers: %s', dict(request.headers))
+    logger.debug('Body: %s', request.get_data())
+
+@app.after_request
+def after_request(response):
+    logger.debug('Response: %s', response.get_data())
+    return response
 
 def init_db():
     with app.app_context():
@@ -73,46 +103,86 @@ def login():
 
 @app.route('/api/auth/register', methods=['POST'])
 def register():
-    data = request.get_json()
+    logger.info('Registration request received')
+    logger.debug('Request Headers: %s', dict(request.headers))
+    
+    try:
+        data = request.get_json()
+        logger.debug('Registration data received: %s', data)
+    except Exception as e:
+        logger.error('Failed to parse JSON data: %s', str(e))
+        return jsonify({
+            'success': False,
+            'message': 'Invalid JSON data'
+        }), 400
+    
+    if not all(key in data for key in ['username', 'email', 'password', 'full_name']):
+        logger.error('Missing required fields in registration data')
+        return jsonify({
+            'success': False,
+            'message': 'Missing required fields'
+        }), 400
     
     # Check if username or email already exists
     if User.query.filter_by(username=data['username']).first():
-        return jsonify({'message': 'Username already exists'}), 400
+        logger.warning(f'Username {data["username"]} already exists')
+        return jsonify({'success': False, 'message': 'Username already exists'}), 400
     
     if User.query.filter_by(email=data['email']).first():
-        return jsonify({'message': 'Email already exists'}), 400
+        logger.warning(f'Email {data["email"]} already exists')
+        return jsonify({'success': False, 'message': 'Email already exists'}), 400
     
-    # Create new user
-    new_user = User(
-        username=data['username'],
-        email=data['email'],
-        password_hash=generate_password_hash(data['password']),
-        full_name=data['full_name'],
-        role='user',
-        balance=0.0
-    )
-    
-    db.session.add(new_user)
-    db.session.commit()
-    
-    # Create QR code for the new user
-    qr_code = QRCode(user_id=new_user.id)
-    db.session.add(qr_code)
-    db.session.commit()
-    
-    # Create default meal plan if provided
-    if 'meal_plan' in data:
-        meal_plan = MealPlan(
-            user_id=new_user.id,
-            plan_type=data['meal_plan']['plan_type'],
-            meals_remaining=data['meal_plan']['meals_remaining'],
-            start_date=datetime.utcnow(),
-            end_date=datetime.utcnow() + timedelta(days=30)  # Default 30 days
+    try:
+        # Create new user
+        logger.info('Creating new user')
+        new_user = User(
+            username=data['username'],
+            email=data['email'],
+            password_hash=generate_password_hash(data['password']),
+            full_name=data['full_name'],
+            role='user',
+            balance=0.0
         )
-        db.session.add(meal_plan)
+        
+        db.session.add(new_user)
         db.session.commit()
-    
-    return jsonify({'message': 'User registered successfully'}), 201
+        logger.info(f'User created with ID: {new_user.id}')
+        
+        # Create QR code for the new user
+        logger.info('Creating QR code for user')
+        qr_code = QRCode(user_id=new_user.id)
+        db.session.add(qr_code)
+        db.session.commit()
+        logger.info('QR code created')
+        
+        # Create access token for auto-login
+        access_token = create_access_token(identity=new_user.id)
+        logger.info('Access token created')
+        
+        response_data = {
+            'success': True,
+            'message': 'User registered successfully',
+            'access_token': access_token,
+            'user': {
+                'id': new_user.id,
+                'username': new_user.username,
+                'email': new_user.email,
+                'full_name': new_user.full_name,
+                'role': new_user.role,
+                'balance': new_user.balance
+            }
+        }
+        logger.info('Registration successful')
+        return jsonify(response_data), 201
+        
+    except Exception as e:
+        logger.error(f'Error during registration: {str(e)}')
+        logger.error('Stack trace:', exc_info=True)
+        db.session.rollback()
+        return jsonify({
+            'success': False,
+            'message': f'Registration failed: {str(e)}'
+        }), 500
 
 # QR Code routes
 @app.route('/api/qrcode/<user_id>', methods=['GET'])
@@ -748,5 +818,14 @@ def get_transaction_stats():
         'extra_item_transactions': extra_count
     }), 200
 
+# Add a test route
+@app.route('/')
+def test_server():
+    return jsonify({
+        'status': 'success',
+        'message': 'Flask server is running'
+    })
+
 if __name__ == '__main__':
-    app.run(debug=True) 
+    # Run the app on all network interfaces
+    app.run(host='0.0.0.0', port=5000, debug=True) 

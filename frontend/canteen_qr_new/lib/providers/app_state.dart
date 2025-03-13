@@ -37,10 +37,23 @@ class AppState extends ChangeNotifier {
     }
   }
 
-  Future<void> register(Map<String, dynamic> userData) async {
+  Future<Map<String, dynamic>> register(Map<String, dynamic> userData) async {
     setLoading(true);
     try {
-      await ApiService.register(userData);
+      final response = await ApiService.register(userData);
+      if (response['success'] == true) {
+        _currentUser = User.fromJson(response['user']);
+        await _fetchMealPlan();
+        await _fetchTransactions();
+      }
+      return response;
+    } catch (e, stackTrace) {
+      print('Error in register: $e');
+      print('Stack trace: $stackTrace');
+      return {
+        'success': false,
+        'message': 'Registration failed: ${e.toString()}'
+      };
     } finally {
       setLoading(false);
     }

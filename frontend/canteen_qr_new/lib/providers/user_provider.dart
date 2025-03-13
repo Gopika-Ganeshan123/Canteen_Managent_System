@@ -42,40 +42,37 @@ class UserProvider extends ChangeNotifier {
     }
   }
 
-  Future<bool> login(String email, String password) async {
+  Future<Map<String, dynamic>> login(String email, String password) async {
     _isLoading = true;
+    _error = null;
     notifyListeners();
 
     try {
-      // For demo purposes, we'll create a mock user
-      await Future.delayed(const Duration(seconds: 1));
-
-      if (email.isNotEmpty && password.isNotEmpty) {
+      final response = await ApiService.login(email, password);
+      
+      if (response['access_token'] != null) {
         _user = User(
-          id: '1',
-          name: 'John Doe',
-          email: email,
-          role: 'student',
-          balance: 500.0,
+          id: response['user']['id'].toString(),
+          name: response['user']['full_name'],
+          email: response['user']['email'],
+          role: response['user']['role'],
+          balance: response['user']['balance'].toDouble(),
         );
         _isLoggedIn = true;
-
-        // Save user to shared preferences
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setString('user', 'logged_in');
-
         _isLoading = false;
         notifyListeners();
-        return true;
+        return response;
       } else {
+        _error = response['message'] ?? 'Login failed';
         _isLoading = false;
         notifyListeners();
-        return false;
+        return {'error': _error};
       }
     } catch (e) {
+      _error = 'An error occurred. Please try again.';
       _isLoading = false;
       notifyListeners();
-      return false;
+      return {'error': _error};
     }
   }
 

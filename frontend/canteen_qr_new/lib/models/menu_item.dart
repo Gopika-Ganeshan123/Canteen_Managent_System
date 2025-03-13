@@ -6,6 +6,8 @@ class MenuItem {
   final String category;
   final bool isAvailable;
   final String? imageUrl;
+  final String mealType;
+  final bool isVeg;
 
   MenuItem({
     required this.id,
@@ -15,6 +17,8 @@ class MenuItem {
     required this.category,
     required this.isAvailable,
     this.imageUrl,
+    required this.mealType,
+    required this.isVeg,
   });
 
   factory MenuItem.fromJson(Map<String, dynamic> json) {
@@ -26,6 +30,8 @@ class MenuItem {
       category: json['category'],
       isAvailable: json['is_available'],
       imageUrl: json['image_url'],
+      mealType: json['meal_type'] ?? 'breakfast',
+      isVeg: json['is_veg'] ?? true,
     );
   }
 
@@ -38,6 +44,8 @@ class MenuItem {
       'category': category,
       'is_available': isAvailable,
       'image_url': imageUrl,
+      'meal_type': mealType,
+      'is_veg': isVeg,
     };
   }
 } 

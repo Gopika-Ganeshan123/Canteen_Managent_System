@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../providers/app_state.dart';
 import '../constants/app_constants.dart';
-import '../providers/user_provider.dart';
-import '../widgets/custom_card.dart';
-import '../widgets/custom_button.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({Key? key}) : super(key: key);
@@ -22,66 +20,69 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Future<void> _fetchData() async {
-    setState(() {
-      _isLoading = true;
-    });
-
+    setState(() => _isLoading = true);
     try {
-      await Provider.of<UserProvider>(context, listen: false).refreshUserProfile();
-      setState(() {
-        _isLoading = false;
-      });
-    } catch (e) {
-      setState(() {
-        _isLoading = false;
-      });
+      final appState = Provider.of<AppState>(context, listen: false);
+      await appState.login(appState.currentUser?.username ?? '', ''); // Refresh user data
+    } finally {
+      setState(() => _isLoading = false);
     }
   }
 
-  Widget _buildQuickActionCard({
-    required IconData icon,
+  Widget _buildQuickActionButton({
     required String title,
+    required IconData icon,
     required VoidCallback onTap,
   }) {
-    return CustomCard(
-      onTap: onTap,
-      padding: const EdgeInsets.all(12),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            icon,
-            size: 32,
-            color: AppColors.primary,
+    return Expanded(
+      child: InkWell(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.05),
+                blurRadius: 10,
+                offset: const Offset(0, 2),
+              ),
+            ],
           ),
-          const SizedBox(height: 8),
-          Text(
-            title,
-            style: AppTextStyles.bodyMedium.copyWith(
-              fontWeight: FontWeight.w600,
-            ),
-            textAlign: TextAlign.center,
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                icon,
+                size: 24,
+                color: Theme.of(context).primaryColor,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    final userProvider = Provider.of<UserProvider>(context);
-    final user = userProvider.user;
-    
+    final appState = Provider.of<AppState>(context);
+    final user = appState.currentUser;
+
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: Colors.grey[100],
       appBar: AppBar(
-        backgroundColor: AppColors.primary,
-        elevation: 0,
-        title: Text(
-          'Dashboard',
-          style: AppTextStyles.heading3.copyWith(color: Colors.white),
-        ),
-        centerTitle: false,
+        title: const Text('Dashboard'),
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
@@ -93,35 +94,38 @@ class _DashboardScreenState extends State<DashboardScreen> {
         onRefresh: _fetchData,
         child: SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.all(AppSpacing.md),
+          padding: const EdgeInsets.all(16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Greeting
-              if (user != null)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 16),
-                  child: Text(
-                    'Hello, ${user.name.split(' ')[0]}!',
-                    style: AppTextStyles.heading2,
+              if (user != null) ...[
+                Text(
+                  'Hello, ${user.fullName.split(' ')[0]}!',
+                  style: const TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
                   ),
                 ),
-              
-              // Balance Card
-              if (user != null)
-                CustomCard(
-                  padding: const EdgeInsets.all(AppSpacing.lg),
-                  backgroundColor: AppColors.primary,
+                const SizedBox(height: 16),
+                // Balance Card
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).primaryColor,
+                    borderRadius: BorderRadius.circular(16),
+                  ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text(
+                          const Text(
                             'Current Balance',
-                            style: AppTextStyles.bodyMedium.copyWith(
-                              color: Colors.white.withOpacity(0.8),
+                            style: TextStyle(
+                              color: Colors.white70,
+                              fontSize: 16,
                             ),
                           ),
                           Container(
@@ -130,14 +134,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               vertical: 6,
                             ),
                             decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.2),
-                              borderRadius: AppBorderRadius.md,
+                              color: Colors.white24,
+                              borderRadius: BorderRadius.circular(20),
                             ),
                             child: Text(
                               user.role.toUpperCase(),
-                              style: AppTextStyles.bodySmall.copyWith(
+                              style: const TextStyle(
                                 color: Colors.white,
-                                fontWeight: FontWeight.w600,
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
                               ),
                             ),
                           ),
@@ -146,113 +151,132 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       const SizedBox(height: 8),
                       Text(
                         '₹${user.balance.toStringAsFixed(2)}',
-                        style: AppTextStyles.heading1.copyWith(
+                        style: const TextStyle(
                           color: Colors.white,
                           fontSize: 32,
+                          fontWeight: FontWeight.bold,
                         ),
                       ),
-                      const SizedBox(height: 20),
-                      CustomButton(
-                        text: 'Add Money',
-                        onPressed: () {
-                          // Navigate to add money screen
-                        },
-                        color: Colors.white,
-                        icon: Icons.add,
+                      const SizedBox(height: 16),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton.icon(
+                          onPressed: () {
+                            // TODO: Implement add money functionality
+                          },
+                          icon: const Icon(Icons.add),
+                          label: const Text('Add Money'),
+                          style: ElevatedButton.styleFrom(
+                            foregroundColor: Theme.of(context).primaryColor,
+                            backgroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                          ),
+                        ),
                       ),
                     ],
                   ),
                 ),
-              
-              // Quick Actions
-              Padding(
-                padding: const EdgeInsets.only(top: 24, bottom: 16),
-                child: Text(
+                const SizedBox(height: 24),
+                const Text(
                   'Quick Actions',
-                  style: AppTextStyles.heading3,
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
-              ),
-              
-              Row(
-                children: [
-                  Expanded(
-                    child: _buildQuickActionCard(
-                      icon: Icons.qr_code_scanner,
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    _buildQuickActionButton(
                       title: 'Scan QR',
+                      icon: Icons.qr_code_scanner,
                       onTap: () {
-                        Navigator.pushNamed(context, '/qr_scanner');
+                        // Will be handled by FAB
                       },
                     ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: _buildQuickActionCard(
-                      icon: Icons.restaurant_menu,
+                    const SizedBox(width: 16),
+                    _buildQuickActionButton(
                       title: 'View Menu',
+                      icon: Icons.restaurant_menu,
                       onTap: () {
-                        // Navigate to meals tab
-                        final pageController = DefaultTabController.of(context);
-                        if (pageController != null) {
-                          pageController.animateTo(2); // Meals tab index
-                        }
+                        // Navigate to meals tab using Navigator
+                        Navigator.pushNamed(context, '/meals');
                       },
                     ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: _buildQuickActionCard(
-                      icon: Icons.history,
+                    const SizedBox(width: 16),
+                    _buildQuickActionButton(
                       title: 'History',
+                      icon: Icons.history,
                       onTap: () {
-                        // Show transaction history
+                        // TODO: Implement history view
                       },
                     ),
-                  ),
-                ],
-              ),
-              
-              // Recent Transactions
-              Padding(
-                padding: const EdgeInsets.only(top: 24, bottom: 16),
-                child: Row(
+                  ],
+                ),
+                const SizedBox(height: 24),
+                Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(
+                    const Text(
                       'Recent Transactions',
-                      style: AppTextStyles.heading3,
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                     TextButton(
                       onPressed: () {
-                        // Navigate to full transaction history
+                        // TODO: Navigate to full transaction history
                       },
                       child: Text(
                         'View All',
-                        style: AppTextStyles.bodyMedium.copyWith(
-                          color: AppColors.primary,
+                        style: TextStyle(
+                          color: Theme.of(context).primaryColor,
                           fontWeight: FontWeight.w600,
                         ),
                       ),
                     ),
                   ],
                 ),
-              ),
-              
-              // Placeholder for transactions
-              CustomCard(
-                child: _isLoading
-                    ? const Center(
-                        child: Padding(
-                          padding: EdgeInsets.all(20.0),
-                          child: CircularProgressIndicator(),
-                        ),
-                      )
-                    : const Padding(
-                        padding: EdgeInsets.all(16.0),
-                        child: Center(
-                          child: Text('No recent transactions'),
-                        ),
+                const SizedBox(height: 8),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.05),
+                        blurRadius: 10,
+                        offset: const Offset(0, 2),
                       ),
-              ),
+                    ],
+                  ),
+                  child: _isLoading
+                      ? const Center(
+                          child: Padding(
+                            padding: EdgeInsets.all(20),
+                            child: CircularProgressIndicator(),
+                          ),
+                        )
+                      : const Center(
+                          child: Padding(
+                            padding: EdgeInsets.all(20),
+                            child: Text(
+                              'No recent transactions',
+                              style: TextStyle(
+                                color: Colors.grey,
+                                fontSize: 16,
+                              ),
+                            ),
+                          ),
+                        ),
+                ),
+              ],
             ],
           ),
         ),
